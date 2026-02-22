@@ -4,7 +4,7 @@
 
 ## 📌 Overview
 
-Built for a 2-day university mini-project, this application analyzes a student's webcam feed in real-time to determine if they are **Attentive**, **Distracted**, or **Drowsy**. It leverages computer vision and biometric calculations to provide an automated way to monitor engagement during online classes or study sessions.
+This application analyzes a student's webcam feed in real-time to determine if they are **Attentive**, **Distracted**, or **Drowsy**. It leverages computer vision and biometric calculations to provide an automated way to monitor engagement during online classes or study sessions.
 
 ## ✨ Features
 
