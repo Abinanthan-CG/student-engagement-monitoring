@@ -185,16 +185,12 @@ class EngagementProcessor(VideoProcessorBase):
             min_tracking_confidence=0.5
         )
         self.drowsy_frames = 0
-        self.ear_threshold = st.session_state.ear_thresh
-        self.yaw_threshold = st.session_state.yaw_thresh
-        self.pitch_threshold = st.session_state.pitch_thresh
+        self.ear_threshold = 0.20
+        self.yaw_threshold = 20.0
+        self.pitch_threshold = 20.0
         self.consecutive_frames_threshold = 20
         
     def recv(self, frame: av.VideoFrame) -> av.VideoFrame:
-        # Update thresholds dynamically
-        self.ear_threshold = st.session_state.ear_thresh
-        self.yaw_threshold = st.session_state.yaw_thresh
-        self.pitch_threshold = st.session_state.pitch_thresh
         
         # Convert frame to numpy array (BGR mode for OpenCV)
         image = frame.to_ndarray(format="bgr24")
@@ -391,6 +387,12 @@ with col1:
 # Display metrics chart below the webcam
 st.subheader("📈 Live Engagement Score")
 chart_placeholder = st.empty()
+
+# Update processor thresholds if stream is playing
+if ctx.state.playing and ctx.video_processor:
+    ctx.video_processor.ear_threshold = st.session_state.ear_thresh
+    ctx.video_processor.yaw_threshold = st.session_state.yaw_thresh
+    ctx.video_processor.pitch_threshold = st.session_state.pitch_thresh
 
 # We can run a small loop inside streamlit to update the chart 
 # if the stream is actively playing.
