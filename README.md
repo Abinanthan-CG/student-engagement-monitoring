@@ -21,13 +21,11 @@
 
 <br/>
 
-> 💡 **Built as a mini-project in under 3 hours.** This system monitors a student's live webcam feed and uses computer vision to determine — frame by frame — whether they're engaged, distracted, or drowsy. No cloud ML APIs. No subscriptions. Just math and code.
-
 ---
 
 ## 🚀 Try It Live
 
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/abinanthan-cg/student-engagement-monitoring/main/app.py)
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://student-engagement-monitoring.streamlit.app/)
 
 > Click the badge above to launch the live app directly in your browser. No setup needed — just allow webcam access and the system will start calibrating.
 
@@ -47,15 +45,6 @@ The EAR is a simple but surprisingly effective formula introduced by Soukupová 
   <img src="assets/ear_diagram.png" alt="EAR Diagram" width="80%"/>
 </p>
 
-```
-          p2 ●      ● p3
-         /                \
-p1 ●                        ● p4
-         \                /
-          p6 ●      ● p5
-
-EAR = (||p2 - p6|| + ||p3 - p5||) / (2 × ||p1 - p4||)
-```
 
 | Eyes State                    | Typical EAR | Status        |
 | ----------------------------- | ----------- | ------------- |
