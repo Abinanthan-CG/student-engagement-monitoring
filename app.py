@@ -308,77 +308,210 @@ class EngagementProcessor(VideoProcessorBase):
 
 
 # -----------------------------------------------------------------------------
-# 5. Streamlit UI
+# 5. Custom CSS — Premium Dark UI
 # -----------------------------------------------------------------------------
-st.title("👨‍🎓 Student Engagement Monitoring System")
 st.markdown("""
-<div style='background-color: #f0f2f6; padding: 10px; border-radius: 5px;'>
-    <strong>Welcome!</strong> This application monitors a student's webcam feed in real-time.
-    It uses <em>Eye Aspect Ratio (EAR)</em> and <em>calibrated Head Pose estimation</em> to determine 
-    if the student is <strong>Engaged</strong>, <strong>Distracted</strong>, or <strong>Drowsy</strong>.
-    <br/><br/>
-    When you first start, hold still and look at the screen for ~2 seconds while the system calibrates to your natural head position.
-</div>
-<br/>
+<style>
+/* ── Global ─────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+
+/* ── Main background ────────────────────────────────────────── */
+.stApp { background: #0d1117; color: #e6edf3; }
+section[data-testid="stSidebar"] { background: #161b22 !important; border-right: 1px solid #30363d; }
+
+/* ── Metric cards ───────────────────────────────────────────── */
+.metric-card {
+    background: linear-gradient(135deg, #161b22 0%, #1c2430 100%);
+    border: 1px solid #30363d;
+    border-radius: 14px;
+    padding: 20px 18px;
+    text-align: center;
+    transition: transform 0.2s, border-color 0.2s;
+}
+.metric-card:hover { transform: translateY(-3px); border-color: #58a6ff; }
+.metric-label { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em;
+                color: #8b949e; text-transform: uppercase; margin-bottom: 6px; }
+.metric-value { font-size: 2rem; font-weight: 700; color: #e6edf3; line-height: 1; }
+.metric-sub   { font-size: 0.72rem; color: #6e7681; margin-top: 4px; }
+
+/* ── Status badge ───────────────────────────────────────────── */
+.status-engaged    { color: #3fb950; }
+.status-distracted { color: #f0883e; }
+.status-drowsy     { color: #f85149; }
+.status-default    { color: #8b949e; }
+
+/* ── Section header ─────────────────────────────────────────── */
+.section-header {
+    font-size: 0.7rem; font-weight: 600; letter-spacing: 0.1em;
+    color: #58a6ff; text-transform: uppercase; margin-bottom: 12px;
+    border-bottom: 1px solid #21262d; padding-bottom: 6px;
+}
+
+/* ── Hero banner ────────────────────────────────────────────── */
+.hero-banner {
+    background: linear-gradient(135deg, #0d1117 0%, #1a2332 50%, #0d1117 100%);
+    border: 1px solid #30363d;
+    border-radius: 16px;
+    padding: 32px 36px;
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
+}
+.hero-banner::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(ellipse at 20% 50%, rgba(31,111,235,0.08) 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 50%, rgba(63,185,80,0.05) 0%, transparent 60%);
+    pointer-events: none;
+}
+.hero-title { font-size: 1.8rem; font-weight: 700; color: #e6edf3; margin-bottom: 8px; }
+.hero-sub   { font-size: 0.95rem; color: #8b949e; line-height: 1.6; }
+
+/* ── Chart container ────────────────────────────────────────── */
+.chart-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 14px;
+    padding: 20px;
+    margin-top: 16px;
+}
+
+/* ── Streamlit overrides ────────────────────────────────────── */
+.stButton > button {
+    background: linear-gradient(135deg, #1f6feb, #58a6ff);
+    color: white; border: none; border-radius: 8px;
+    font-weight: 600; padding: 8px 20px; width: 100%;
+    transition: opacity 0.2s;
+}
+.stButton > button:hover { opacity: 0.85; }
+div[data-testid="stSlider"] > label { color: #8b949e !important; font-size: 0.85rem !important; }
+.stSlider [data-baseweb="slider"] .rc-slider-track { background: #1f6feb !important; }
+h1, h2, h3 { color: #e6edf3 !important; }
+.stInfo { background: #161b22 !important; border: 1px solid #1f6feb !important; color: #8b949e !important; border-radius: 10px !important; }
+</style>
 """, unsafe_allow_html=True)
 
-col1, col2 = st.columns([3, 1])
-
-with col2:
-    st.subheader("⚙️ Settings")
-    st.write("Adjust detection sensitivity:")
+# -----------------------------------------------------------------------------
+# 6. Sidebar — Settings (hidden by default, user opens it)
+# -----------------------------------------------------------------------------
+with st.sidebar:
+    st.markdown('<div class="section-header">⚙️ Detection Settings</div>', unsafe_allow_html=True)
+    st.caption("Fine-tune how sensitive the AI is to your movements.")
 
     st.session_state.ear_thresh = st.slider(
-        "EAR Threshold (Drowsiness)",
-        min_value=0.10, max_value=0.40, value=0.20, step=0.01,
-        help="Eye Aspect Ratio below this value for 25 frames → Drowsy."
+        "👁️ EAR Threshold (Drowsiness)",
+        min_value=0.10, max_value=0.40,
+        value=st.session_state.get("ear_thresh", 0.20), step=0.01,
+        help="Eye Aspect Ratio below this for 25+ frames = Drowsy."
     )
     st.session_state.yaw_thresh = st.slider(
-        "Yaw Threshold (Left/Right)",
-        min_value=10.0, max_value=60.0, value=30.0, step=1.0,
-        help="Calibrated sideways head turn beyond this angle → Distracted."
+        "↔️ Yaw Threshold (Left/Right)",
+        min_value=10.0, max_value=60.0,
+        value=st.session_state.get("yaw_thresh", 30.0), step=1.0,
+        help="Calibrated sideways angle beyond this = Distracted."
     )
     st.session_state.pitch_thresh = st.slider(
-        "Pitch Threshold (Up/Down)",
-        min_value=10.0, max_value=60.0, value=30.0, step=1.0,
-        help="Calibrated up/down head tilt beyond this angle → Distracted."
+        "↕️ Pitch Threshold (Up/Down)",
+        min_value=10.0, max_value=60.0,
+        value=st.session_state.get("pitch_thresh", 30.0), step=1.0,
+        help="Calibrated up/down angle beyond this = Distracted."
     )
 
     st.markdown("---")
+    st.markdown('<div class="section-header">🔧 Calibration</div>', unsafe_allow_html=True)
+    st.caption("Moved positions? Recalibrate so the AI resets to your new natural head angle.")
+    if st.button("🔄 Reset Calibration"):
+        st.session_state["reset_calib"] = True
+
+    st.markdown("---")
+    st.markdown('<div class="section-header">📖 Status Guide</div>', unsafe_allow_html=True)
     st.markdown("""
-    ### 📊 Status Guide
-    - 🟢 **Engaged** (score 100): Eyes open, facing screen.
-    - 🟠 **Distracted** (score 50): Head turned away for >15 frames.
-    - 🔴 **Drowsy** (score 0): Eyes closed for >25 frames.
-    - ⏳ **Calibrating**: Hold still & look at screen.
+- 🟢 **Engaged** — Eyes open, facing screen
+- 🟠 **Distracted** — Head turned >15 frames
+- 🔴 **Drowsy** — Eyes closed >25 frames
+- ⏳ **Calibrating** — Hold still at start
     """)
 
     st.markdown("---")
-    if st.button("🔄 Reset Calibration"):
-        # Signal the processor to re-calibrate next time
-        st.session_state["reset_calib"] = True
+    st.caption("Built with MediaPipe · OpenCV · Streamlit-WebRTC")
 
-with col1:
-    st.subheader("📷 Live Monitor")
 
-    ctx = webrtc_streamer(
-        key="engagement-monitor",
-        video_processor_factory=EngagementProcessor,
-        mode=WebRtcMode.SENDRECV,
-        rtc_configuration={
-            "iceServers": [
-                {"urls": ["stun:stun.l.google.com:19302"]},
-                {"urls": ["stun:stun1.l.google.com:19302"]},
-                {"urls": ["stun:stun2.l.google.com:19302"]},
-                {"urls": ["stun:stun3.l.google.com:19302"]},
-                {"urls": ["stun:stun4.l.google.com:19302"]},
-            ]
-        },
-        media_stream_constraints={"video": True, "audio": False},
-        async_processing=True,
-    )
+# -----------------------------------------------------------------------------
+# 7. Main Page — Hero Banner
+# -----------------------------------------------------------------------------
+st.markdown("""
+<div class="hero-banner">
+    <div class="hero-title">👨‍🎓 Student Engagement Monitor</div>
+    <div class="hero-sub">
+        Real-time AI attention analysis using <strong>Eye Aspect Ratio</strong> (EAR) and 
+        <strong>calibrated 3D Head Pose estimation</strong>.<br/>
+        When you start the camera, hold still for ~2 seconds — the system will calibrate to <em>your</em> natural head position.
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
-# Push updated thresholds and handle calibration reset from main thread
+# ── Live status metric cards above the webcam ──
+m1, m2, m3 = st.columns(3)
+_status_hist = state_manager.get_history()
+_last_status = "—"
+if _status_hist:
+    _s = _status_hist[-1]
+    _last_status = "Engaged" if _s == 100 else ("Distracted" if _s == 50 else "Drowsy")
+_engaged_pct = (
+    round(_status_hist.count(100) / len(_status_hist) * 100) if _status_hist else "—"
+)
+_avg_score = round(sum(_status_hist) / len(_status_hist)) if _status_hist else "—"
+
+with m1:
+    cls = {"Engaged": "status-engaged", "Distracted": "status-distracted",
+           "Drowsy": "status-drowsy"}.get(_last_status, "status-default")
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-label">Current Status</div>
+        <div class="metric-value {cls}">{_last_status}</div>
+        <div class="metric-sub">Updated every frame</div>
+    </div>""", unsafe_allow_html=True)
+
+with m2:
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-label">Time Engaged</div>
+        <div class="metric-value" style="color:#3fb950;">{_engaged_pct}{'%' if isinstance(_engaged_pct, int) else ''}</div>
+        <div class="metric-sub">of monitored session</div>
+    </div>""", unsafe_allow_html=True)
+
+with m3:
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-label">Avg Score</div>
+        <div class="metric-value" style="color:#58a6ff;">{_avg_score}{'/100' if isinstance(_avg_score, int) else ''}</div>
+        <div class="metric-sub">0=Drowsy · 50=Distracted · 100=Engaged</div>
+    </div>""", unsafe_allow_html=True)
+
+st.markdown("<br/>", unsafe_allow_html=True)
+
+# ── Webcam Stream ──
+st.markdown('<div class="section-header">📷 Live Monitor</div>', unsafe_allow_html=True)
+
+ctx = webrtc_streamer(
+    key="engagement-monitor",
+    video_processor_factory=EngagementProcessor,
+    mode=WebRtcMode.SENDRECV,
+    rtc_configuration={
+        "iceServers": [
+            {"urls": ["stun:stun.l.google.com:19302"]},
+            {"urls": ["stun:stun1.l.google.com:19302"]},
+            {"urls": ["stun:stun2.l.google.com:19302"]},
+            {"urls": ["stun:stun3.l.google.com:19302"]},
+            {"urls": ["stun:stun4.l.google.com:19302"]},
+        ]
+    },
+    media_stream_constraints={"video": True, "audio": False},
+    async_processing=True,
+)
+
+# ── Sync thresholds & handle calibration reset from main thread ──
 if ctx.state.playing and ctx.video_processor:
     vp = ctx.video_processor
     vp.ear_threshold   = st.session_state.ear_thresh
@@ -386,33 +519,36 @@ if ctx.state.playing and ctx.video_processor:
     vp.pitch_threshold = st.session_state.pitch_thresh
 
     if st.session_state.get("reset_calib", False):
-        vp.calibrating      = True
-        vp.calib_count      = 0
-        vp.calib_yaws       = []
-        vp.calib_pitches    = []
-        vp.current_status   = "Calibrating"
-        vp.drowsy_count     = 0
-        vp.distract_count   = 0
-        vp.recover_count    = 0
+        vp.calibrating    = True
+        vp.calib_count    = 0
+        vp.calib_yaws     = []
+        vp.calib_pitches  = []
+        vp.current_status = "Calibrating"
+        vp.drowsy_count   = 0
+        vp.distract_count = 0
+        vp.recover_count  = 0
         st.session_state["reset_calib"] = False
 
 # -----------------------------------------------------------------------------
-# 6. Live Engagement Chart
+# 8. Live Engagement Chart
 # -----------------------------------------------------------------------------
-st.subheader("📈 Live Engagement Score")
+st.markdown("<br/>", unsafe_allow_html=True)
+st.markdown('<div class="section-header">📈 Live Engagement Score</div>', unsafe_allow_html=True)
 chart_placeholder = st.empty()
 
 if ctx.state.playing:
+    import pandas as pd
     while True:
         history = state_manager.get_history()
         time.sleep(0.5)
         if history:
-            import pandas as pd
-            df = pd.DataFrame({"Engagement Score": history})
-            chart_placeholder.line_chart(df)
+            df = pd.DataFrame({"Engagement Score (0=Drowsy · 50=Distracted · 100=Engaged)": history})
+            chart_placeholder.line_chart(df, use_container_width=True, height=200)
         else:
-            chart_placeholder.write("Collecting data...")
+            chart_placeholder.markdown(
+                '<div class="metric-card" style="color:#8b949e;">⏳ Collecting data...</div>',
+                unsafe_allow_html=True)
         if not ctx.state.playing:
             break
 else:
-    chart_placeholder.info("▶️ Start the webcam feed above to begin monitoring.")
+    chart_placeholder.info("▶️ Click **START** above to begin live monitoring. Settings are in the ← sidebar.")
