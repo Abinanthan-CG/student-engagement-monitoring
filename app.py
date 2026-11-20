@@ -708,18 +708,19 @@ def _render_header(is_playing: bool) -> str:
     )
 
 
-def _render_kpi_bar(history: list, is_playing: bool) -> str:
-    n = len(history)
+def _render_kpi_bar(history: list, session_samples: list, is_playing: bool) -> str:
+    source = session_samples if session_samples else history
+    n = len(source)
     if n > 0:
-        last = history[-1]
+        last = history[-1] if history else source[-1]
         if last == 100:
             s_text, s_col = "Engaged", "#10B981"
         elif last == 50:
             s_text, s_col = "Distracted", "#F59E0B"
         else:
             s_text, s_col = "Drowsy", "#EF4444"
-        eng_pct = round(history.count(100) / n * 100)
-        avg_val = round(sum(history) / n)
+        eng_pct = round(source.count(100) / n * 100)
+        avg_val = round(sum(source) / n)
         eng_html = f'{eng_pct}<span class="kpi-u">%</span>'
         avg_html = f'{avg_val}<span class="kpi-u">/100</span>'
     else:
@@ -748,9 +749,10 @@ def _render_kpi_bar(history: list, is_playing: bool) -> str:
     )
 
 
-def _render_chart(history: list, is_playing: bool) -> str:
+def _render_chart(session_samples: list, history: list, is_playing: bool, poll_sec: float = 0.25) -> str:
     meta = "LIVE" if is_playing else "IDLE"
-    if not history:
+    series = session_samples[-240:] if session_samples else history
+    if not series:
         title = "Calibrating baseline..." if is_playing else "Stream offline"
         sub = (
             "Hold still and face the screen (~2 seconds)"
@@ -762,13 +764,13 @@ def _render_chart(history: list, is_playing: bool) -> str:
         w, h = 560, 248
         pad_l, pad_r, pad_t, pad_b = 34, 14, 18, 24
         pw, ph = w - pad_l - pad_r, h - pad_t - pad_b
-        n = len(history)
+        n = len(series)
         pts = [
             (
                 round(pad_l + (pw if n == 1 else (i / (n - 1)) * pw), 1),
                 round(pad_t + (1.0 - max(0.0, min(100.0, float(v))) / 100.0) * ph, 1),
             )
-            for i, v in enumerate(history)
+            for i, v in enumerate(series)
         ]
         line_pts = " ".join(f"{x},{y}" for x, y in pts)
         y0 = pad_t + ph
@@ -776,8 +778,9 @@ def _render_chart(history: list, is_playing: bool) -> str:
         y100 = pad_t
         area_pts = f"{pts[0][0]},{y0} {line_pts} {pts[-1][0]},{y0}"
         lx, ly = pts[-1]
-        lv = history[-1]
+        lv = series[-1]
         dot_c = "#10B981" if lv == 100 else ("#F59E0B" if lv == 50 else "#EF4444")
+        span_label = f"-{int(round(n * poll_sec))}s" if session_samples else f"T-{n}"
 
         inner = (
             f'<svg viewBox="0 0 {w} {h}" width="100%" height="248" preserveAspectRatio="none" style="display:block;">'
@@ -795,7 +798,7 @@ def _render_chart(history: list, is_playing: bool) -> str:
             f'<polyline points="{line_pts}" fill="none" stroke="#60A5FA" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'
             f'<circle cx="{lx}" cy="{ly}" r="5.5" fill="{dot_c}" opacity="0.24"/>'
             f'<circle cx="{lx}" cy="{ly}" r="3" fill="{dot_c}" stroke="#0F1318" stroke-width="1.5"/>'
-            f'<text x="{pad_l}" y="{h - 5}" fill="#64748B" font-family="JetBrains Mono,monospace" font-size="9.5">T-{n}</text>'
+            f'<text x="{pad_l}" y="{h - 5}" fill="#64748B" font-family="JetBrains Mono,monospace" font-size="9.5">{span_label}</text>'
             f'<text x="{w - pad_r}" y="{h - 5}" text-anchor="end" fill="#94A3B8" font-family="JetBrains Mono,monospace" font-size="9.5">NOW</text>'
             '</svg>'
         )
@@ -806,18 +809,26 @@ def _render_chart(history: list, is_playing: bool) -> str:
     )
 
 
-def _render_diagnostics(history: list) -> str:
-    n = len(history)
+def _render_diagnostics(session_samples: list, history: list, poll_sec: float = 0.25) -> str:
+    source = session_samples if session_samples else history
+    n = len(source)
     if n > 0:
-        e_n, d_n, dr_n = history.count(100), history.count(50), history.count(0)
-        e_p, d_p = round(e_n / n * 100), round(d_n / n * 100)
-        dr_p = max(0, 100 - e_p - d_p)
+        e_n, d_n, dr_n = source.count(100), source.count(50), source.count(0)
+        e_pct_f = e_n / n * 100.0
+        d_pct_f = d_n / n * 100.0
+        dr_pct_f = dr_n / n * 100.0
         bar = (
-            f'<div style="width:{e_p}%;background:#10B981;"></div>'
-            f'<div style="width:{d_p}%;background:#F59E0B;"></div>'
-            f'<div style="width:{dr_p}%;background:#EF4444;"></div>'
+            f'<div style="width:{e_pct_f:.2f}%;background:#10B981;"></div>'
+            f'<div style="width:{d_pct_f:.2f}%;background:#F59E0B;"></div>'
+            f'<div style="width:{dr_pct_f:.2f}%;background:#EF4444;"></div>'
         )
-        e_s, d_s, dr_s = f"{e_p}% ({e_n})", f"{d_p}% ({d_n})", f"{dr_p}% ({dr_n})"
+        def _fmt(cnt: int, pct: float) -> str:
+            p_str = "<1%" if (cnt > 0 and round(pct) == 0) else f"{round(pct)}%"
+            dur_str = f"{cnt * poll_sec:.1f}s" if session_samples else f"{cnt}f"
+            return f"{p_str} ({dur_str})"
+        e_s = _fmt(e_n, e_pct_f)
+        d_s = _fmt(d_n, d_pct_f)
+        dr_s = _fmt(dr_n, dr_pct_f)
     else:
         bar = '<div style="width:100%;background:#1D2430;"></div>'
         e_s = d_s = dr_s = "&mdash;"
@@ -941,28 +952,50 @@ with col_chart:
     chart_placeholder = st.empty()
 
 # Hidden secondary diagnostics (collapsed by default)
+if "_ui_session_samples" not in st.session_state:
+    st.session_state._ui_session_samples = []
+
 with st.expander("Session Breakdown & Parameters", expanded=False):
     diag_placeholder = st.empty()
     st.caption("Hold still for ~2 seconds after starting the camera to auto-calibrate your resting head position. Open the sidebar (top-left) to adjust detection thresholds or recalibrate.")
+    if st.button("Reset Session Stats"):
+        st.session_state._ui_session_samples = []
 
 
 # -----------------------------------------------------------------------------
 # 8. Live Telemetry Update Loop
 # -----------------------------------------------------------------------------
+_POLL_SEC = 0.25
+_STATUS_SCORE = {"Engaged": 100, "Distracted": 50, "Drowsy": 0}
 is_playing = bool(ctx.state.playing)
 header_placeholder.markdown(_render_header(is_playing), unsafe_allow_html=True)
 
 initial_history = state_manager.get_history()
-kpi_placeholder.markdown(_render_kpi_bar(initial_history, is_playing), unsafe_allow_html=True)
-chart_placeholder.markdown(_render_chart(initial_history, is_playing), unsafe_allow_html=True)
-diag_placeholder.markdown(_render_diagnostics(initial_history), unsafe_allow_html=True)
+session_samples = st.session_state._ui_session_samples
+kpi_placeholder.markdown(_render_kpi_bar(initial_history, session_samples, is_playing), unsafe_allow_html=True)
+chart_placeholder.markdown(_render_chart(session_samples, initial_history, is_playing, _POLL_SEC), unsafe_allow_html=True)
+diag_placeholder.markdown(_render_diagnostics(session_samples, initial_history, _POLL_SEC), unsafe_allow_html=True)
 
 if ctx.state.playing:
     while True:
-        time.sleep(0.5)
+        time.sleep(_POLL_SEC)
         history = state_manager.get_history()
-        kpi_placeholder.markdown(_render_kpi_bar(history, True), unsafe_allow_html=True)
-        chart_placeholder.markdown(_render_chart(history, True), unsafe_allow_html=True)
-        diag_placeholder.markdown(_render_diagnostics(history), unsafe_allow_html=True)
+        vp = ctx.video_processor
+        vp_score = _STATUS_SCORE.get(getattr(vp, "current_status", None)) if vp else None
+
+        sample = None
+        if vp_score is not None:
+            sample = vp_score
+        elif not getattr(vp, "calibrating", False) and history:
+            recent = history[-8:]
+            sample = 0 if 0 in recent else (50 if 50 in recent else history[-1])
+
+        if sample is not None:
+            session_samples.append(sample)
+
+        live_ref = [sample] if sample is not None else history
+        kpi_placeholder.markdown(_render_kpi_bar(live_ref, session_samples, True), unsafe_allow_html=True)
+        chart_placeholder.markdown(_render_chart(session_samples, history, True, _POLL_SEC), unsafe_allow_html=True)
+        diag_placeholder.markdown(_render_diagnostics(session_samples, history, _POLL_SEC), unsafe_allow_html=True)
         if not ctx.state.playing:
             break
