@@ -400,6 +400,16 @@ div[data-testid="stSlider"] [data-baseweb="slider"] > div > div > div {
     background: #1A2230 !important;
     border-color: var(--accent) !important;
 }
+.stButton > button[kind="primary"],
+.stButton > button[data-testid="stBaseButton-primary"] {
+    background: rgba(59, 130, 246, 0.14) !important;
+    border-color: var(--accent) !important;
+    color: #93C5FD !important;
+}
+section[data-testid="stSidebar"] .stButton > button {
+    padding: 0.42rem 0.5rem !important;
+    font-size: 0.76rem !important;
+}
 
 /* Minimal expander for hidden secondary diagnostics */
 div[data-testid="stExpander"] {
@@ -854,29 +864,66 @@ def _render_diagnostics(session_samples: list, history: list, poll_sec: float = 
 # -----------------------------------------------------------------------------
 # 6. Sidebar — Hidden by Default (Settings, Calibration & Reference)
 # -----------------------------------------------------------------------------
+_PRESETS = {
+    "Strict":   {"ear_thresh": 0.24, "yaw_thresh": 20.0, "pitch_thresh": 20.0},
+    "Balanced": {"ear_thresh": 0.20, "yaw_thresh": 30.0, "pitch_thresh": 30.0},
+    "Relaxed":  {"ear_thresh": 0.17, "yaw_thresh": 42.0, "pitch_thresh": 40.0},
+}
+
+
+def _apply_preset(preset_name: str):
+    cfg = _PRESETS[preset_name]
+    st.session_state["ear_thresh"] = cfg["ear_thresh"]
+    st.session_state["yaw_thresh"] = cfg["yaw_thresh"]
+    st.session_state["pitch_thresh"] = cfg["pitch_thresh"]
+
+
 with st.sidebar:
     st.markdown(
+        '<div class="sb-label">Sensitivity Preset</div>'
+        '<div class="sb-note">Quick profiles for exam, lecture, or note-taking sessions.</div>',
+        unsafe_allow_html=True,
+    )
+    p1, p2, p3 = st.columns(3, gap="small")
+    for col, name in zip((p1, p2, p3), ("Strict", "Balanced", "Relaxed")):
+        cfg = _PRESETS[name]
+        is_active = (
+            abs(st.session_state.get("ear_thresh", 0.20) - cfg["ear_thresh"]) < 1e-6
+            and abs(st.session_state.get("yaw_thresh", 30.0) - cfg["yaw_thresh"]) < 1e-6
+            and abs(st.session_state.get("pitch_thresh", 30.0) - cfg["pitch_thresh"]) < 1e-6
+        )
+        with col:
+            st.button(
+                name,
+                key=f"preset_{name.lower()}",
+                type="primary" if is_active else "secondary",
+                on_click=_apply_preset,
+                args=(name,),
+            )
+
+    st.markdown("---")
+    st.markdown(
         '<div class="sb-label">Detection Settings</div>'
-        '<div class="sb-note">Thresholds sync live with the active video stream.</div>',
+        '<div class="sb-note">Fine-tune thresholds live without restarting the stream.</div>',
         unsafe_allow_html=True,
     )
 
-    st.session_state.ear_thresh = st.slider(
+    st.slider(
         "EAR Threshold (Drowsiness)",
         min_value=0.10, max_value=0.40,
-        value=st.session_state.get("ear_thresh", 0.20), step=0.01,
+        step=0.01, key="ear_thresh",
         help="Eye Aspect Ratio below this for 25+ frames = Drowsy."
     )
-    st.session_state.yaw_thresh = st.slider(
+    st.slider(
         "Yaw Limit (deg)",
         min_value=10.0, max_value=60.0,
-        value=st.session_state.get("yaw_thresh", 30.0), step=1.0,
+        step=1.0, key="yaw_thresh",
         help="Calibrated horizontal turn beyond this = Distracted."
     )
-    st.session_state.pitch_thresh = st.slider(
+    st.slider(
         "Pitch Limit (deg)",
         min_value=10.0, max_value=60.0,
-        value=st.session_state.get("pitch_thresh", 30.0), step=1.0,
+        step=1.0, key="pitch_thresh",
         help="Calibrated vertical tilt beyond this = Distracted."
     )
 
